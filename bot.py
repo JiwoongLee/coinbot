@@ -1,6 +1,8 @@
 import time
 import pyupbit
+from datetime import datetime
 from pytz import timezone
+import requests
 
 SELECTED_COINS = ['XRP', 'ETC', 'VET', 'SC', 'GAS', 'BTT', 'BCH', 'BTC', 'EOS', 'TRX',
                     'NEO', 'QTUM', 'BTG', 'ETH', 'BCHA', 'THETA', 'XEM', 'LTC', 'ADA']
@@ -15,8 +17,16 @@ with open("key.txt") as f:
     lines = f.readlines()
     key = lines[0].strip()
     secret = lines[1].strip()
+    mytoken = lines[2].strip()  # slack bot token
 
 upbit = pyupbit.Upbit(key, secret)
+
+def post_message_to_slack(channel, text):
+    response = requests.post("https://slack.com/api/chat.postMessage",
+        headers={"Authorization": "Bearer "+mytoken},
+        data={"channel": channel,"text": text}
+    )
+    print(response)
 
 def candidate_coins():
     if SELECTED_COINS:
@@ -87,8 +97,8 @@ def retry_get_ohlcv(market, day, count):
 
 if __name__ == '__main__':
     print('main')
-    trade_markets = list(candidate_coins())
-    #trade_markets = pyupbit.get_tickers("KRW")
+    #trade_markets = list(candidate_coins())
+    trade_markets = pyupbit.get_tickers("KRW")
     print(trade_markets)
     print('market count: {0}'.format(len(trade_markets)))
     already_buy = {}
@@ -115,7 +125,7 @@ if __name__ == '__main__':
             if market in already_buy:
                 if t.hour == 8 and t.minute >= 59:
                     account = upbit.get_balance(market)
-                    sell(market, account)
+                    #sell(market, account)
                     coin_investable += 1
                 continue
 
@@ -134,7 +144,9 @@ if __name__ == '__main__':
 
             if over_ratio > 1.0:
                 print('market:{0}, coin_betting_ratio:{1}, over_ratio:{2}'.format(market, coin_betting_ratio[market], over_ratio))
-                buy(market, BETTING_BUDGET * coin_betting_ratio[market])
+                post_message_to_slack("#personal",
+                                        "market:{0}, coin_betting_ratio:{1}, over_ratio:{2}".format(market, coin_betting_ratio[market], over_ratio))
+                #buy(market, BETTING_BUDGET * coin_betting_ratio[market])
                 already_buy[market] = True
                 coin_investable -= 1
 
